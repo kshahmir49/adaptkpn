@@ -32,11 +32,6 @@ pip install -r requirements.txt
 
 For GPU use, install the PyTorch build that matches your CUDA version.
 
-## Dataset note
-
-This repository does not include Mayo CT, FMD microscopy, natural-image datasets, checkpoints, or generated outputs.
-
-Do not commit medical DICOM files, raw datasets, large `.npy` files, checkpoints, or HPC logs.
 
 ## Run one CT image
 
@@ -82,7 +77,7 @@ python scripts/mayo/summarize_rangegated_dicom_results.py \
 
 Expected FMD structure:
 
-```text
+```test
 FMD_ROOT/
   raw/
     Confocal_BPAE_B_1.png
