@@ -1,7 +1,5 @@
 # Range-gated zero-shot denoising
 
-Clean code for the proposed method.
-
 Files:
 
 ```text
@@ -51,8 +49,6 @@ python denoise.py \
   --out-dir outputs/mayo_b30_l096
 ```
 
-For a smoke test, add `--limit 1 --epochs 50`.
-
 ## One FMD image
 
 ```bash
@@ -81,9 +77,3 @@ python denoise.py \
   --epochs 500 \
   --out-dir outputs/fmd
 ```
-
-For a smoke test, add `--limit 1 --epochs 50`.
-
-## Outputs
-
-Each run writes denoised PNGs and a results CSV in `--out-dir`.
