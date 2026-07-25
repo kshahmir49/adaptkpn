@@ -1,2 +1,0 @@
-task_id,kernel,patient,pair_idx,pair_key,pair_mode,low_path,full_path,window_min,window_max
-0,B30,L096,0,z_0.000,z,/path/to/quarter.IMA,/path/to/full.IMA,-3000,3000
