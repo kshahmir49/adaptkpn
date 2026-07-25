@@ -2,6 +2,5 @@ torch
 numpy
 pandas
 pydicom
-matplotlib
 Pillow
 scikit-image
