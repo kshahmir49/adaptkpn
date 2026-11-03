@@ -44,10 +44,25 @@ python denoise.py --manifest manifests/b30.csv --out-dir outputs/b30
 To split the work across jobs, add `--start 200 --limit 200` (slices 200 to 399).
 For D45, pass the D45 folder name to `--kernel` and add `--dataset mayo-d45` in step 1.
 
+## Run on FMD (fluorescence microscopy)
+
+Expected layout is `FMD/raw/...` and `FMD/gt/...` with matching file names.
+
+```bash
+python make_fmd_manifest.py --root /path/to/FMD --out manifests/fmd.csv --channels gray
+python denoise.py --dataset fmd --manifest manifests/fmd.csv --channels gray --epochs 500 --out-dir outputs/fmd
+```
+
+Use `--channels rgb` for the color subsets. One image works too.
+
+```bash
+python denoise.py --dataset fmd --noisy raw/img.png --target gt/img.png --channels gray
+```
+
 ## Notes
 
 - Each slice is min-max normalized to [0, 1] on its own before training and scoring.
 - Default settings are 3 stages, 2000 epochs, Adam (lr 1e-3, halved every 1000 epochs), and EMA plus an 8-fold flip and rotation ensemble at the end. Run `python denoise.py --help` for the rest.
 - `--fixed-blend 0.8` uses a constant blend instead of the learned one.
 - No GPU is used if none is found, but 2000 epochs on a 512x512 slice is slow on CPU.
-- Other inputs work too. `.dcm`/`.ima` files (see `make_mayo_manifest.py`), RGB photos with `--channels rgb`, and FMD (see `make_fmd_manifest.py`).
+- Other inputs work too. `.dcm`/`.ima` files (see `make_mayo_manifest.py`) and RGB photos with `--channels rgb`.
