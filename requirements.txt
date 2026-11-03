@@ -1,6 +1,5 @@
 torch
 numpy
-pandas
-pydicom
 Pillow
 scikit-image
+pydicom

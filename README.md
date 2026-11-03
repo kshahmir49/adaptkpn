@@ -1,95 +1,53 @@
-# AdaptKPN, zero-shot denoising
+# AdaptKPN
 
-AdaptKPN is a three-stage cascade of adaptive kernel-prediction stages (about 2.7k parameters).
-Each stage predicts a 5x5 softmax kernel and a per-pixel blend alpha, and outputs
-`alpha * weighted_average + (1 - alpha) * input`. It is trained per image with the zero-shot
-Noise2Noise pair-downsampling loss plus an auxiliary Poisson-thinning loss, using Adam with StepLR,
-EMA weights and an 8-fold rotation/flip self-ensemble at inference.
-
-Notes on settings
-
-- `--fixed-blend 0.8` uses the original constant 0.8/0.2 blend (the setup behind the first B30 numbers).
-  Leave it unset for the learned per-pixel blend.
-- `--blend-init` sets the initial blend logit. Natural-image runs used -3.0, -1.5 and -0.5 for sigma 10, 25 and 50. D45 used -1.0.
-- DICOM input (`.dcm`, `.ima`) is converted to HU and clipped to `--window-min/--window-max` (default -3000 to 3000), then scaled to [0, 1].
-  PNG input is scaled by its dtype range. Window choice changes absolute PSNR, so use the same window for every method you compare.
-- Defaults are 2000 epochs, lr 1e-3, StepLR step 1000 gamma 0.5, Poisson peak 50 weight 0.25.
-- This repo runs AdaptKPN only. Filter2Noise comparisons are run separately.
-
-Files:
-
-```text
-denoise.py              train and run our method on one image or a manifest
-make_mayo_manifest.py   create Mayo B30/D45 low/full DICOM manifests
-make_fmd_manifest.py    create FMD raw/GT manifests
-requirements.txt
-```
+Zero-shot CT denoising. It trains on the single noisy image, so no clean data and no pretraining are needed.
 
 ## Install
 
 ```bash
-conda create -n rangegated python=3.10 -y
-conda activate rangegated
 pip install -r requirements.txt
 ```
 
-## One Mayo image
+## Run on one slice
 
 ```bash
-python denoise.py \
-  --dataset mayo-b30 \
-  --noisy /path/to/quarter.IMA \
-  --target /path/to/full.IMA \
-  --epochs 50 \
-  --out-dir outputs/mayo_one
+python denoise.py --noisy low_dose.png --target full_dose.png
 ```
 
-Use `--dataset mayo-d45` for D45. Use the default `--epochs 2000` for the full setting.
+The denoised image and `results.csv` (PSNR and SSIM) are saved in `outputs/`.
+`--target` is optional and is only used to report the scores.
+For a quick test add `--epochs 200`.
 
-## Full Mayo folder
+## Run on a whole dataset
+
+The PNG slices should be laid out like this.
+
+```text
+Preprocessed_512x512/512/
+  Quarter Dose/1mm/Soft Kernel (B30)/L096/*.png
+  Full Dose/1mm/Soft Kernel (B30)/L096/*.png
+```
+
+1. Make the list of slice pairs.
 
 ```bash
-python make_mayo_manifest.py \
-  --dataset mayo-b30 \
-  --patient L096 \
-  --low-dir "/path/to/quarter_1mm/L096/quarter_1mm" \
-  --full-dir "/path/to/full_1mm/L096/full_1mm" \
-  --out manifests/mayo_b30_l096.csv
+python make_png_manifest.py --root Preprocessed_512x512/512 \
+  --kernel "Soft Kernel (B30)" --patients L096 L506 L109 --out manifests/b30.csv
 ```
+
+2. Denoise them all.
 
 ```bash
-python denoise.py \
-  --dataset mayo-b30 \
-  --manifest manifests/mayo_b30_l096.csv \
-  --epochs 2000 \
-  --out-dir outputs/mayo_b30_l096
+python denoise.py --manifest manifests/b30.csv --out-dir outputs/b30
 ```
 
-## One FMD image
+To split the work across jobs, add `--start 200 --limit 200` (slices 200 to 399).
+For D45, pass the D45 folder name to `--kernel` and add `--dataset mayo-d45` in step 1.
 
-```bash
-python denoise.py \
-  --dataset fmd \
-  --noisy /path/to/FMD/raw/TwoPhoton_BPAE_B_2.png \
-  --target /path/to/FMD/gt/TwoPhoton_BPAE_B_2.png \
-  --channels gray \
-  --epochs 50 \
-  --out-dir outputs/fmd_one
-```
+## Notes
 
-## Full FMD folder
-
-```bash
-python make_fmd_manifest.py \
-  --root /path/to/FMD \
-  --out manifests/fmd.csv \
-  --channels gray
-```
-
-```bash
-python denoise.py \
-  --dataset fmd \
-  --manifest manifests/fmd.csv \
-  --epochs 2000 \
-  --out-dir outputs/fmd
-```
+- Each slice is min-max normalized to [0, 1] on its own before training and scoring.
+- Default settings are 3 stages, 2000 epochs, Adam (lr 1e-3, halved every 1000 epochs), and EMA plus an 8-fold flip and rotation ensemble at the end. Run `python denoise.py --help` for the rest.
+- `--fixed-blend 0.8` uses a constant blend instead of the learned one.
+- No GPU is used if none is found, but 2000 epochs on a 512x512 slice is slow on CPU.
+- Other inputs work too. `.dcm`/`.ima` files (see `make_mayo_manifest.py`), RGB photos with `--channels rgb`, and FMD (see `make_fmd_manifest.py`).

@@ -70,8 +70,6 @@ def main():
             "pair_key": key,
             "low_path": low[key],
             "full_path": full[key],
-            "window_min": -3000,
-            "window_max": 3000,
             "channels": "gray",
             "tag": f"{args.dataset}_{args.patient}_{i:04d}",
         })

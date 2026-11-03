@@ -146,7 +146,20 @@ def denoise_self_ensemble(model, y, enabled=True):
     return (acc / 8.0).contiguous()
 
 
-def load_image(path, device, channels="gray", window_min=-3000.0, window_max=3000.0):
+def minmax(arr):
+    arr = arr.astype(np.float32)
+    lo, hi = float(arr.min()), float(arr.max())
+    if hi > lo:
+        return ((arr - lo) / (hi - lo)).astype(np.float32)
+    return np.zeros_like(arr, dtype=np.float32)
+
+
+def load_image(path, device, channels="gray"):
+    """Load an image as a 1xCxHxW float tensor in [0, 1].
+
+    CT input (png, dcm, ima, npy) is min-max normalized per image.
+    Natural images (channels="rgb") are scaled by their dtype range.
+    """
     path = Path(path)
     suffix = path.suffix.lower()
 
@@ -154,29 +167,24 @@ def load_image(path, device, channels="gray", window_min=-3000.0, window_max=300
         import pydicom
         ds = pydicom.dcmread(str(path), force=True)
         arr = ds.pixel_array.astype(np.float32)
-        slope = float(getattr(ds, "RescaleSlope", 1.0))
-        intercept = float(getattr(ds, "RescaleIntercept", 0.0))
-        hu = arr * slope + intercept
-        arr = (np.clip(hu, window_min, window_max) - window_min) / (window_max - window_min)
-        arr = np.clip(arr, 0.0, 1.0).astype(np.float32)
-        return torch.from_numpy(arr).unsqueeze(0).unsqueeze(0).to(device).contiguous()
+        arr = arr * float(getattr(ds, "RescaleSlope", 1.0)) + float(getattr(ds, "RescaleIntercept", 0.0))
+        return torch.from_numpy(minmax(arr)).unsqueeze(0).unsqueeze(0).to(device).contiguous()
 
     if suffix == ".npy":
         arr = np.load(path).astype(np.float32).squeeze()
         if arr.ndim != 2:
             raise ValueError(f"Expected 2D .npy image: {path}")
-        arr = np.clip(arr, 0.0, 1.0).astype(np.float32)
-        return torch.from_numpy(arr).unsqueeze(0).unsqueeze(0).to(device).contiguous()
+        return torch.from_numpy(minmax(arr)).unsqueeze(0).unsqueeze(0).to(device).contiguous()
 
     img = Image.open(path)
     if channels == "rgb":
-        img = img.convert("RGB")
-        arr = normalize_array(np.asarray(img))
+        arr = normalize_array(np.asarray(img.convert("RGB")))
         x = torch.from_numpy(arr).permute(2, 0, 1).unsqueeze(0)
     else:
-        img = img.convert("L")
-        arr = normalize_array(np.asarray(img))
-        x = torch.from_numpy(arr).unsqueeze(0).unsqueeze(0)
+        arr = np.asarray(img)
+        if arr.ndim == 3:
+            arr = arr[..., 0]
+        x = torch.from_numpy(minmax(arr)).unsqueeze(0).unsqueeze(0)
     return x.to(device=device, dtype=torch.float32).contiguous()
 
 
@@ -281,14 +289,11 @@ def run_pair(row, args, device, index=0):
     dataset = row.get("dataset", args.dataset)
     channels = row.get("channels", "gray" if dataset.startswith("mayo") else args.channels)
 
-    window_min = float(row.get("window_min", args.window_min))
-    window_max = float(row.get("window_max", args.window_max))
-
     noisy_path = row.get("noisy") or row.get("low_path") or row.get("raw_path")
     target_path = row.get("target") or row.get("full_path") or row.get("gt_path")
 
-    noisy = load_image(noisy_path, device, channels=channels, window_min=window_min, window_max=window_max)
-    target = None if not target_path else even_crop(load_image(target_path, device, channels=channels, window_min=window_min, window_max=window_max))
+    noisy = load_image(noisy_path, device, channels=channels)
+    target = None if not target_path else even_crop(load_image(target_path, device, channels=channels))
 
     den, info = train(noisy, args, device)
 
@@ -354,8 +359,6 @@ def build_single_row(args):
         "noisy": args.noisy,
         "target": args.target or "",
         "channels": args.channels,
-        "window_min": args.window_min,
-        "window_max": args.window_max,
     }
 
 
@@ -374,8 +377,6 @@ def parse_args():
 
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--channels", choices=["gray", "rgb"], default="gray")
-    p.add_argument("--window-min", type=float, default=-3000.0)
-    p.add_argument("--window-max", type=float, default=3000.0)
 
     p.add_argument("--epochs", type=int, default=2000)
     p.add_argument("--lr", type=float, default=1e-3)
