@@ -1,4 +1,13 @@
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env/
+.DS_Store
 outputs/
-manifests/
+results/
+manifests/*.csv
+*.log
+*.err
+*.out
