@@ -12,7 +12,6 @@ from skimage.metrics import structural_similarity
 import torch
 
 from adaptkpn import frozen_args, train_adaptkpn
-from baselines.zsn2n import train_zsn2n
 
 
 def load_gray(path, device):
@@ -51,7 +50,8 @@ def write_rows(path, rows):
                 fields.append(key)
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields)
-        w.writeheader(); w.writerows(rows)
+        w.writeheader()
+        w.writerows(rows)
 
 
 def main():
@@ -62,7 +62,6 @@ def main():
     ap.add_argument("--out-dir", default="outputs/fmd")
     ap.add_argument("--epochs", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=123)
-    ap.add_argument("--run-zsn2n", action="store_true")
     ap.add_argument("--save-images", action="store_true")
     ap.add_argument("--no-amp", action="store_true")
     args = ap.parse_args()
@@ -87,35 +86,28 @@ def main():
             clean = load_gray(src.gt_path, device)
             if noisy.shape != clean.shape:
                 raise ValueError(f"Shape mismatch {tuple(noisy.shape)} vs {tuple(clean.shape)}")
-            row["height"] = int(noisy.shape[-2]); row["width"] = int(noisy.shape[-1])
-            row["noisy_psnr"] = psnr(noisy, clean); row["noisy_ssim"] = ssim(noisy, clean)
 
-            zden = None
-            if args.run_zsn2n:
-                sync(device)
-                t0 = time.perf_counter()
-                zmodel, zden, zloss = train_zsn2n(
-                    noisy, epochs=args.epochs, seed=args.seed + 10000 + int(src.task_id)
-                )
-                sync(device)
-                row["zsn2n_seconds"] = time.perf_counter() - t0
-                row["zsn2n_psnr"] = psnr(zden, clean); row["zsn2n_ssim"] = ssim(zden, clean)
-                row["zsn2n_params"] = sum(p.numel() for p in zmodel.parameters() if p.requires_grad)
-                row["zsn2n_final_loss"] = zloss
+            row["height"] = int(noisy.shape[-2])
+            row["width"] = int(noisy.shape[-1])
+            row["noisy_psnr"] = psnr(noisy, clean)
+            row["noisy_ssim"] = ssim(noisy, clean)
 
             cfg = frozen_args(
                 seed=args.seed + 20000 + int(src.task_id),
                 epochs=args.epochs,
                 amp=not args.no_amp,
             )
+
             sync(device)
             t0 = time.perf_counter()
             model, final_loss = train_adaptkpn(noisy, cfg, device)
             with torch.no_grad():
                 den = model(noisy).clamp(0, 1).contiguous()
             sync(device)
+
             row["adaptkpn_seconds"] = time.perf_counter() - t0
-            row["adaptkpn_psnr"] = psnr(den, clean); row["adaptkpn_ssim"] = ssim(den, clean)
+            row["adaptkpn_psnr"] = psnr(den, clean)
+            row["adaptkpn_ssim"] = ssim(den, clean)
             row["adaptkpn_params"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
             row["adaptkpn_final_loss"] = final_loss
             row["adaptkpn_sigma_r_values"] = ";".join(f"{v:.8f}" for v in model.sigma_r_values())
@@ -125,12 +117,12 @@ def main():
             if args.save_images:
                 stem = Path(src.raw_path).stem
                 save_gray(noisy, out_dir / f"{stem}_noisy.png")
-                if zden is not None:
-                    save_gray(zden, out_dir / f"{stem}_zsn2n.png")
                 save_gray(den, out_dir / f"{stem}_adaptkpn.png")
                 save_gray(clean, out_dir / f"{stem}_gt.png")
         except Exception as exc:
-            row["status"] = "error"; row["error"] = repr(exc)
+            row["status"] = "error"
+            row["error"] = repr(exc)
+
         rows.append(row)
 
     out_csv = out_dir / f"fmd_batch_{args.batch_index}.csv"

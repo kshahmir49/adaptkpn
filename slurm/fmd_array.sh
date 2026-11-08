@@ -26,5 +26,4 @@ python scripts/fmd/run.py \
   --batch-size "$BATCH_SIZE" \
   --out-dir "$OUT_DIR" \
   --epochs 2000 \
-  --run-zsn2n \
   --save-images

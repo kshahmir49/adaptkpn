@@ -17,4 +17,4 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["adaptkpn*", "baselines*"]
+include = ["adaptkpn*"]
