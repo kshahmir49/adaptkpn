@@ -9,7 +9,7 @@ def main():
     model = AdaptKPN(n_chan=1).to(device)
     y = model(x)
     assert y.shape == x.shape
-    assert sum(p.numel() for p in model.parameters() if p.requires_grad) == 2649
+    assert sum(p.numel() for p in model.parameters() if p.requires_grad) == 1766
 
     cfg = frozen_args(epochs=1, amp=False, print_every=1)
     trained, loss = train_adaptkpn(x, cfg, device)

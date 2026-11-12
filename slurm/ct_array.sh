@@ -20,10 +20,12 @@ set -euo pipefail
 : "${NORMALIZATION:?set NORMALIZATION to fixed4095 or minmax}"
 OUT_DIR="${OUT_DIR:-outputs/ct}"
 BATCH_SIZE="${BATCH_SIZE:-1}"
+LAMBDA_EDGE="${LAMBDA_EDGE:-350}"
 
 python scripts/ct/run.py \
   --manifest "$MANIFEST" \
   --normalization "$NORMALIZATION" \
+  --lambda-edge "$LAMBDA_EDGE" \
   --batch-index "${SLURM_ARRAY_TASK_ID}" \
   --batch-size "$BATCH_SIZE" \
   --out-dir "$OUT_DIR" \

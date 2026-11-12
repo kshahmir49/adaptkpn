@@ -81,6 +81,8 @@ def main():
     ap.add_argument("--seed", type=int, default=123)
     ap.add_argument("--save-images", action="store_true")
     ap.add_argument("--no-amp", action="store_true")
+    ap.add_argument("--lambda-edge", type=float, default=350.0,
+                    help="edge-loss weight: 75 for B30 (minmax), 350 for D45 (fixed4095)")
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -106,7 +108,8 @@ def main():
             row["noisy_psnr"] = psnr(noisy, clean)
             row["noisy_ssim"] = ssim(noisy, clean)
 
-            cfg = frozen_args(seed=args.seed + int(src.task_id), epochs=args.epochs, amp=not args.no_amp)
+            cfg = frozen_args(seed=args.seed + int(src.task_id), epochs=args.epochs, amp=not args.no_amp,
+                              adapt_lambda_edge=args.lambda_edge)
             sync(device)
             t0 = time.perf_counter()
             model, final_loss = train_adaptkpn(noisy, cfg, device)
@@ -121,6 +124,7 @@ def main():
             row["adaptkpn_sigma_r_values"] = ";".join(f"{v:.8f}" for v in model.sigma_r_values())
             row["normalization"] = args.normalization
             row["epochs"] = args.epochs
+            row["adapt_lambda_edge"] = args.lambda_edge
 
             if args.save_images:
                 stem = f"task_{int(src.task_id):05d}"
