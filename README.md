@@ -8,21 +8,21 @@ This repository contains the final AdaptKPN implementation used for the CT and f
 
 | Setting | Value |
 | --- | --- |
-| Stages | 3 |
+| Stages | 2 |
 | Spatial kernel | 5 x 5 |
 | Hidden channels | 16 |
 | Stage output | 0.75 filtered + 0.25 input |
 | Range sigma initialization | 0.08 |
 | Range sigma bounds | 0.005 to 0.25 |
 | Optimizer | AdamW |
-| Learning rate | 1e-3 |
+| Learning rate | 1.6e-2 |
 | Weight decay | 0.01 |
 | Scheduler | OneCycleLR |
-| Edge-loss weight | 350 |
-| EMA | 0.999 |
+| Edge-loss weight | 350 (75 for CT B30) |
+| EMA | off |
 | AMP | enabled on CUDA |
 
-The grayscale model has 2,649 trainable parameters.
+The grayscale model has 1,766 trainable parameters.
 
 ## Installation
 
@@ -101,6 +101,7 @@ B30 uses independent per-slice min-max normalization to `[0, 1]`.
 python scripts/ct/run.py \
   --manifest manifests/b30_patient.csv \
   --normalization minmax \
+  --lambda-edge 75 \
   --batch-index 0 \
   --batch-size 1 \
   --out-dir outputs/b30
@@ -159,6 +160,9 @@ python scripts/fmd/summarize.py "outputs/fmd/fmd_batch_*.csv" --out-prefix fmd_f
 The example Slurm scripts use generic placeholders only. Customize them for your own cluster before submission.
 
 ```bash
+BATCH_SIZE=1 MAX_PARALLEL=8 OUT_DIR=outputs/b30 LAMBDA_EDGE=75 \
+  bash scripts/ct/submit_slurm.sh manifests/b30_patient.csv minmax
+
 BATCH_SIZE=1 MAX_PARALLEL=8 OUT_DIR=outputs/d45 \
   bash scripts/ct/submit_slurm.sh manifests/d45_patient.csv fixed4095
 
